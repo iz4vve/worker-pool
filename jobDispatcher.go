@@ -1,11 +1,15 @@
+/*
+(c)2018 - Pietro Mascolo
+
+*/
 package workers
 
 import (
 	"fmt"
 	"log"
-
-	"github.com/google/uuid"
 )
+
+var workerID = 0
 
 // JobDispatcher manages a pool of workers
 type JobDispatcher struct {
@@ -15,12 +19,14 @@ type JobDispatcher struct {
 	ErrorChan  chan error
 }
 
+// NewJobDispatcher generates a neww job dispatcher
 func NewJobDispatcher(maxWorkers int) *JobDispatcher {
 	workersPool := make(chan chan ConcurrentJob)
 	errCh := make(chan error)
 	return &JobDispatcher{maxWorkers, workersPool, errCh}
 }
 
+// Run runs a job dispatcher.
 func (jobDis *JobDispatcher) Run(queue chan ConcurrentJob) {
 	for i := 0; i < jobDis.maxWorkers; i++ {
 		worker := NewWorker(jobDis.WorkerPool)
@@ -29,6 +35,12 @@ func (jobDis *JobDispatcher) Run(queue chan ConcurrentJob) {
 	go jobDis.dispatch(queue)
 }
 
+// dispatch contains the logic to route the job to the first idle worker.
+// This first idel worker is returned by the worker pool of the
+// dispatcher, which is a channel of channels linked to separate workers.
+//
+// This setp is blocking (per channel) so that if no worker is available,
+// the whole dispatcher will be blocked until a new worker is available.
 func (jobDis *JobDispatcher) dispatch(queue chan ConcurrentJob) {
 	for {
 		select {
@@ -44,21 +56,27 @@ func (jobDis *JobDispatcher) dispatch(queue chan ConcurrentJob) {
 }
 
 ///////////////////////////
+
+// Worker is the base worker struct
 type Worker struct {
-	ID      uuid.UUID
+	ID      int
 	Pool    chan chan ConcurrentJob
 	JobChan chan ConcurrentJob
 	quit    chan bool
 }
 
+// NewWorker generates a new worker object
 func NewWorker(pool chan chan ConcurrentJob) Worker {
-	return Worker{
-		ID:      uuid.New(),
+	w := Worker{
+		ID:      workerID,
 		Pool:    pool,
 		JobChan: make(chan ConcurrentJob),
 		quit:    make(chan bool)}
+	workerID++
+	return w
 }
 
+// Start initiates a worker job execution
 func (w Worker) Start(errCh chan error) {
 	go func() {
 		for {
@@ -66,10 +84,10 @@ func (w Worker) Start(errCh chan error) {
 			w.Pool <- w.JobChan
 			select {
 			case job := <-w.JobChan:
-				fmt.Printf("%s got job: %v\n", w.ID, job)
+				fmt.Printf("%d got job: %v\n", w.ID, job)
 				// do job
 				if err := job.Execute(); err != nil {
-					log.Printf("Worker %s met an error executing job: %s", w.ID.String(), err.Error())
+					log.Printf("Worker %d met an error executing job: %s", w.ID, err.Error())
 					errCh <- err
 				}
 			case <-w.quit:
@@ -79,6 +97,7 @@ func (w Worker) Start(errCh chan error) {
 	}()
 }
 
+// Stop removes the worker from the worker pool
 func (w Worker) Stop() {
 	go func() {
 		w.quit <- true
