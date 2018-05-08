@@ -17,13 +17,14 @@ type JobDispatcher struct {
 	// pool of worker channels registered
 	WorkerPool chan chan ConcurrentJob
 	ErrorChan  chan error
+	Verbose    bool
 }
 
 // NewJobDispatcher generates a neww job dispatcher
 func NewJobDispatcher(maxWorkers int) *JobDispatcher {
 	workersPool := make(chan chan ConcurrentJob)
 	errCh := make(chan error)
-	return &JobDispatcher{maxWorkers, workersPool, errCh}
+	return &JobDispatcher{maxWorkers, workersPool, errCh, false}
 }
 
 // Run runs a job dispatcher.
@@ -84,10 +85,15 @@ func (w Worker) Start(errCh chan error) {
 			w.Pool <- w.JobChan
 			select {
 			case job := <-w.JobChan:
-				fmt.Printf("%d got job: %v\n", w.ID, job)
+				verbose := job.Verbose()
+				if verbose {
+					fmt.Printf("%d got job: %v\n", w.ID, job)
+				}
 				// do job
 				if err := job.Execute(); err != nil {
-					log.Printf("Worker %d met an error executing job: %s", w.ID, err.Error())
+					if verbose {
+						log.Printf("Worker %d met an error executing job: %s", w.ID, err.Error())
+					}
 					errCh <- err
 				}
 			case <-w.quit:
@@ -107,4 +113,5 @@ func (w Worker) Stop() {
 ///////////////////
 type ConcurrentJob interface {
 	Execute() error
+	Verbose() bool
 }
