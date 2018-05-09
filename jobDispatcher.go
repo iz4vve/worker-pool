@@ -6,7 +6,6 @@ package workers
 
 import (
 	"fmt"
-	"log"
 )
 
 var workerID = 0
@@ -85,15 +84,8 @@ func (w Worker) Start(errCh chan error) {
 			w.Pool <- w.JobChan
 			select {
 			case job := <-w.JobChan:
-				verbose := job.Verbose()
-				if verbose {
-					fmt.Printf("%d got job: %v\n", w.ID, job)
-				}
 				// do job
 				if err := job.Execute(); err != nil {
-					if verbose {
-						log.Printf("Worker %d met an error executing job: %s", w.ID, err.Error())
-					}
 					errCh <- err
 				}
 			case <-w.quit:
@@ -113,5 +105,4 @@ func (w Worker) Stop() {
 ///////////////////
 type ConcurrentJob interface {
 	Execute() error
-	Verbose() bool
 }
