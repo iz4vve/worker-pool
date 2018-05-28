@@ -15,6 +15,7 @@ var workerID = 0
 type JobDispatcher struct {
 	maxWorkers int
 	// pool of worker channels registered
+	Workers    []Worker
 	WorkerPool chan chan ConcurrentJob
 	ErrorChan  chan error
 	Verbose    bool
@@ -24,16 +25,18 @@ type JobDispatcher struct {
 func NewJobDispatcher(maxWorkers int) *JobDispatcher {
 	workersPool := make(chan chan ConcurrentJob)
 	errCh := make(chan error)
-	return &JobDispatcher{maxWorkers, workersPool, errCh, false}
+	var workers []Worker
+	return &JobDispatcher{maxWorkers, workers, workersPool, errCh, false}
 }
 
 // Run runs a job dispatcher.
-func (jobDis *JobDispatcher) Run(queue chan ConcurrentJob) {
+func (jobDis *JobDispatcher) Run(queue chan ConcurrentJob, quit chan bool) {
 	for i := 0; i < jobDis.maxWorkers; i++ {
 		worker := NewWorker(jobDis.WorkerPool)
+		jobDis.Workers = append(jobDis.Workers, worker)
 		worker.Start(jobDis.ErrorChan)
 	}
-	go jobDis.dispatch(queue)
+	go jobDis.dispatch(queue, quit)
 }
 
 // dispatch contains the logic to route the job to the first idle worker.
@@ -42,7 +45,7 @@ func (jobDis *JobDispatcher) Run(queue chan ConcurrentJob) {
 //
 // This setp is blocking (per channel) so that if no worker is available,
 // the whole dispatcher will be blocked until a new worker is available.
-func (jobDis *JobDispatcher) dispatch(queue chan ConcurrentJob) {
+func (jobDis *JobDispatcher) dispatch(queue chan ConcurrentJob, quit chan bool) {
 	for {
 		select {
 		case job := <-queue:
@@ -52,6 +55,10 @@ func (jobDis *JobDispatcher) dispatch(queue chan ConcurrentJob) {
 				// send the job to the worker
 				jobChannel <- job
 			}(job)
+		case <-quit:
+			for _, worker := range jobDis.Workers {
+				worker.Stop()
+			}
 		}
 	}
 }
