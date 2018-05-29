@@ -1,12 +1,6 @@
-/*
-(c)2018 - Pietro Mascolo
-
-*/
+/*Package workers implements a worker pool
+(c)2018 - Pietro Mascolo*/
 package workers
-
-import (
-	"fmt"
-)
 
 var workerID = 0
 
@@ -109,7 +103,7 @@ func (w Worker) Stop() {
 	}()
 }
 
-///////////////////
+// ConcurrentJob is the interface that jobs must implement
 type ConcurrentJob interface {
 	Execute() error
 }
