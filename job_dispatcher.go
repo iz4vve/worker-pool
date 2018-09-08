@@ -1,5 +1,10 @@
-/*Package workers implements a worker pool
-(c)2018 - Pietro Mascolo*/
+// Package workers implements a worker pool
+//
+// A task function has to be passed to the pool
+// in order to be executed when a signal is received
+// by the job channel.
+//
+// (c)2018 - Pietro Mascolo
 package workers
 
 var workerID = 0
@@ -7,11 +12,9 @@ var workerID = 0
 // JobDispatcher manages a pool of workers
 type JobDispatcher struct {
 	maxWorkers int
-	// pool of worker channels registered
 	Workers    []Worker
 	WorkerPool chan chan ConcurrentJob
 	ErrorChan  chan error
-	Verbose    bool
 }
 
 // NewJobDispatcher generates a neww job dispatcher
@@ -19,7 +22,7 @@ func NewJobDispatcher(maxWorkers int) *JobDispatcher {
 	workersPool := make(chan chan ConcurrentJob)
 	errCh := make(chan error)
 	var workers []Worker
-	return &JobDispatcher{maxWorkers, workers, workersPool, errCh, false}
+	return &JobDispatcher{maxWorkers, workers, workersPool, errCh}
 }
 
 // Run runs a job dispatcher.
