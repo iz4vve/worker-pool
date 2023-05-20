@@ -55,6 +55,7 @@ func (jobDis *JobDispatcher) dispatch(queue chan ConcurrentJob, quit chan bool) 
 			for _, worker := range jobDis.Workers {
 				worker.Stop()
 			}
+			break
 		}
 	}
 }
